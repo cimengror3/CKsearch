@@ -14,7 +14,6 @@ fake-useragent>=1.4.0
 # DNS & Network
 dnspython>=2.4.0
 python-whois>=0.8.0
-socket
 
 # Phone Analysis
 phonenumbers>=8.13.0
@@ -32,12 +31,10 @@ questionary>=2.0.0
 
 # Report Generation
 jinja2>=3.1.2
+reportlab>=4.0.0
 
 # Data Processing
 validators>=0.22.0
-
-# Cryptography (for hashing)
-hashlib
 
 # Optional: Tor support
 # PySocks>=1.7.1
