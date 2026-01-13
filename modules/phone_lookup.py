@@ -167,8 +167,22 @@ class PhoneLookup(BaseScanner):
                 results["verified_info"]["carrier"] = nv_data.get("carrier")
             if nv_data.get("line_type"):
                 results["verified_info"]["type"] = nv_data.get("line_type")
+        # 3. REAL Platform Check (Holehe-style)
+        if scan_mode == "deep":
+            console.print("[cyan]→ Checking platform registrations (REAL checks)...[/cyan]")
+            try:
+                from core.platform_checker import PlatformChecker
+                import asyncio
+                checker = PlatformChecker()
+                confirmed = asyncio.run(checker.check_all_phone(parsed["e164"]))
+                results["confirmed_platforms"] = confirmed
+            except Exception as e:
+                console.print(f"[yellow]  Platform check error: {e}[/yellow]")
+                results["confirmed_platforms"] = []
+        else:
+            results["confirmed_platforms"] = []
         
-        # 3. Generate all check links
+        # 4. Generate all check links
         console.print("[cyan]→ Generating verification links...[/cyan]")
         
         # Messenger
