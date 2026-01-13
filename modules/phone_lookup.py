@@ -1,14 +1,15 @@
 """
-CKSEARCH - Phone Number Lookup Module (Ultimate Edition)
+CKSEARCH - Phone Number Lookup Module (Accurate Edition)
 ==========================================================
-Comprehensive phone number intelligence with 50+ check sources.
+Phone intelligence with clear labeling.
+Separates VERIFIED data from manual check links.
 """
 
 import phonenumbers
 from phonenumbers import carrier, geocoder, timezone
 from typing import Dict, Any, Optional, List
 from rich.console import Console
-import time
+from rich.table import Table
 
 import config
 from core.scanner import BaseScanner
@@ -18,103 +19,73 @@ console = Console()
 
 
 # =============================================================================
-# PHONE CHECK PLATFORMS DATABASE
+# VERIFIED DATA SOURCES (API-based)
+# =============================================================================
+# These provide REAL verified data via API
+
+# =============================================================================
+# MANUAL CHECK LINKS (User must verify themselves)
 # =============================================================================
 
-# Messenger & Social Apps (Check by phone number)
-MESSENGER_PLATFORMS = [
-    # Global Messengers
-    {"name": "WhatsApp", "url": "https://wa.me/{phone}", "type": "Direct", "category": "Messenger"},
-    {"name": "Telegram", "url": "https://t.me/+{phone}", "type": "Profile", "category": "Messenger"},
-    {"name": "Viber", "url": "viber://chat?number={phone}", "type": "App", "category": "Messenger"},
-    {"name": "Signal", "url": "https://signal.me/#p/{e164}", "type": "Profile", "category": "Messenger"},
-    {"name": "IMO", "url": "https://imo.im/app?to={phone}", "type": "App", "category": "Messenger"},
-    
-    # Asian Messengers
-    {"name": "Line", "url": "https://line.me/R/ti/p/{phone}", "type": "App", "category": "Asia"},
-    {"name": "KakaoTalk", "url": "https://open.kakao.com/phonenumber/{phone}", "type": "App", "category": "Asia"},
-    {"name": "WeChat", "url": "weixin://dl/business/?t={phone}", "type": "App", "category": "Asia"},
-    {"name": "Zalo", "url": "https://zalo.me/{phone}", "type": "App", "category": "Asia"},
-    
-    # Video Call
-    {"name": "Skype", "url": "skype:{phone}?call", "type": "App", "category": "Video"},
-    {"name": "Zoom", "url": "https://zoom.us/j/{phone}", "type": "General", "category": "Video"},
-    {"name": "Google Meet", "url": "https://meet.google.com/{phone}", "type": "General", "category": "Video"},
+MESSENGER_LINKS = [
+    {"name": "WhatsApp", "url": "https://wa.me/{e164_clean}", "note": "Click to check if number has WhatsApp"},
+    {"name": "Telegram", "url": "https://t.me/+{e164_clean}", "note": "Open in Telegram to check"},
+    {"name": "Viber", "url": "viber://chat?number=+{e164_clean}", "note": "App link - open in Viber"},
+    {"name": "Signal", "url": "https://signal.me/#p/+{e164_clean}", "note": "Signal profile link"},
+    {"name": "Line", "url": "https://line.me/R/ti/p/+{e164_clean}", "note": "Line app link"},
+    {"name": "Zalo", "url": "https://zalo.me/{e164_clean}", "note": "Zalo profile (Vietnam)"},
 ]
 
-# Phone Lookup Services (Caller ID / Spam Check)
-PHONE_LOOKUP_SERVICES = [
-    # Global Caller ID
-    {"name": "Truecaller", "url": "https://www.truecaller.com/search/{region}/{phone_local}", "type": "CallerID", "category": "Lookup"},
-    {"name": "Sync.me", "url": "https://sync.me/search/?number=%2B{phone}", "type": "CallerID", "category": "Lookup"},
-    {"name": "CallerID Test", "url": "https://calleridtest.com/look-up/{phone}", "type": "CallerID", "category": "Lookup"},
-    {"name": "WhoCalled.us", "url": "https://whocalled.us/lookup/{phone}", "type": "Spam", "category": "Lookup"},
-    {"name": "NumLookup", "url": "https://www.numlookup.com/phone-lookup/{phone}", "type": "CallerID", "category": "Lookup"},
-    {"name": "SpyDialer", "url": "https://www.spydialer.com/results.aspx?n={phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "ThatsThem", "url": "https://thatsthem.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "USPhoneBook", "url": "https://www.usphonebook.com/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "NumberGuru", "url": "https://www.numberguru.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "WhoCallsMe", "url": "https://whocallsme.com/Phone-Number.aspx/{phone}", "type": "Spam", "category": "Lookup"},
-    
-    # Spam Databases
-    {"name": "ShouldIAnswer", "url": "https://www.shouldianswer.com/phone-number/{phone}", "type": "Spam", "category": "Spam"},
-    {"name": "Tellows", "url": "https://www.tellows.com/num/{phone}", "type": "Spam", "category": "Spam"},
-    {"name": "CallerComplaints", "url": "https://callercomplaints.com/{phone}", "type": "Spam", "category": "Spam"},
-    {"name": "800Notes", "url": "https://800notes.com/Phone.aspx/{phone}", "type": "Spam", "category": "Spam"},
-    {"name": "Nomorobo", "url": "https://www.nomorobo.com/lookup/{phone}", "type": "Spam", "category": "Spam"},
-    
-    # International
-    {"name": "GetContact", "url": "https://getcontact.com/{phone}", "type": "CallerID", "category": "International"},
-    {"name": "Hiya", "url": "https://hiya.com/phone/{phone}", "type": "CallerID", "category": "International"},
-    {"name": "CallerSmart", "url": "https://callersmart.com/phone-number/{phone}", "type": "CallerID", "category": "International"},
-    {"name": "Whitepages", "url": "https://www.whitepages.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "BeenVerified", "url": "https://www.beenverified.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "Intelius", "url": "https://www.intelius.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "Spokeo", "url": "https://www.spokeo.com/{phone}", "type": "Reverse", "category": "Lookup"},
-    {"name": "PeopleFinder", "url": "https://www.peoplefinder.com/phone/{phone}", "type": "Reverse", "category": "Lookup"},
+CALLER_ID_SERVICES = [
+    {"name": "Truecaller", "url": "https://www.truecaller.com/search/{region}/{local}", "note": "Caller ID lookup"},
+    {"name": "Sync.me", "url": "https://sync.me/search/?number=%2B{e164_clean}", "note": "Caller ID database"},
+    {"name": "GetContact", "url": "https://getcontact.com/{e164_clean}", "note": "Name lookup"},
+    {"name": "Eyecon", "url": "https://www.eyecon.com/", "note": "Caller ID app"},
+    {"name": "Hiya", "url": "https://hiya.com/phone/+{e164_clean}", "note": "Spam check"},
 ]
 
-# Indonesia-specific
-INDONESIA_PHONE_SERVICES = [
-    {"name": "GetContact ID", "url": "https://getcontact.com/id/{phone}", "type": "CallerID", "category": "Indonesia"},
-    {"name": "Truecaller ID", "url": "https://www.truecaller.com/search/id/{phone_local}", "type": "CallerID", "category": "Indonesia"},
-    {"name": "WA Business Check", "url": "https://wa.me/{phone}?text=test", "type": "Business", "category": "Indonesia"},
-    {"name": "GoPay/Gojek", "url": "https://gojek.com/phone/{phone}", "type": "eWallet", "category": "Indonesia"},
-    {"name": "OVO", "url": "https://ovo.id/send/{phone}", "type": "eWallet", "category": "Indonesia"},
-    {"name": "DANA", "url": "https://dana.id/qr/{phone}", "type": "eWallet", "category": "Indonesia"},
-    {"name": "ShopeePay", "url": "https://shopee.co.id/user/{phone}", "type": "eWallet", "category": "Indonesia"},
-    {"name": "LinkAja", "url": "https://www.linkaja.id/send/{phone}", "type": "eWallet", "category": "Indonesia"},
-    {"name": "Tokopedia", "url": "https://www.tokopedia.com/search?q={phone}", "type": "Search", "category": "Indonesia"},
-    {"name": "Bukalapak", "url": "https://www.bukalapak.com/products?search[keywords]={phone}", "type": "Search", "category": "Indonesia"},
+LOOKUP_SERVICES = [
+    {"name": "Whitepages", "url": "https://www.whitepages.com/phone/+{e164_clean}", "note": "US/CA reverse lookup"},
+    {"name": "SpyDialer", "url": "https://www.spydialer.com/results.aspx?n={e164_clean}", "note": "Free reverse lookup"},
+    {"name": "ThatsThem", "url": "https://thatsthem.com/phone/+{e164_clean}", "note": "People search"},
+    {"name": "NumLookup", "url": "https://www.numlookup.com/phone-lookup/{e164_clean}", "note": "Number lookup"},
+    {"name": "USPhoneBook", "url": "https://www.usphonebook.com/{e164_clean}", "note": "US phone directory"},
 ]
 
-# Social Media Search by Phone
-SOCIAL_PHONE_SEARCH = [
-    {"name": "Facebook", "url": "https://www.facebook.com/search/top?q={phone}", "type": "Search", "category": "Social"},
-    {"name": "Twitter/X", "url": "https://twitter.com/search?q={phone}", "type": "Search", "category": "Social"},
-    {"name": "Instagram", "url": "https://www.instagram.com/explore/tags/{phone_local}/", "type": "Search", "category": "Social"},
-    {"name": "LinkedIn", "url": "https://www.linkedin.com/search/results/all/?keywords={phone}", "type": "Search", "category": "Social"},
-    {"name": "TikTok", "url": "https://www.tiktok.com/search?q={phone}", "type": "Search", "category": "Social"},
-    {"name": "VK", "url": "https://vk.com/search?c[q]={phone}&c[section]=auto", "type": "Search", "category": "Social"},
+SPAM_DATABASES = [
+    {"name": "ShouldIAnswer", "url": "https://www.shouldianswer.com/phone-number/+{e164_clean}", "note": "Spam reports"},
+    {"name": "Tellows", "url": "https://www.tellows.com/num/+{e164_clean}", "note": "Spam rating"},
+    {"name": "CallerComplaints", "url": "https://callercomplaints.com/{e164_clean}", "note": "Complaints"},
+    {"name": "800Notes", "url": "https://800notes.com/Phone.aspx/{e164_clean}", "note": "User reports"},
+    {"name": "Nomorobo", "url": "https://www.nomorobo.com/lookup/{e164_clean}", "note": "Robocall check"},
 ]
 
-# Google Dork Queries
-GOOGLE_DORKS_PHONE = [
-    {"name": "Exact Match", "query": '"{phone}"', "category": "Google"},
-    {"name": "Local Format", "query": '"{phone_local}"', "category": "Google"},
-    {"name": "With Spaces", "query": '"{phone_spaced}"', "category": "Google"},
-    {"name": "Site Facebook", "query": 'site:facebook.com "{phone}"', "category": "Google"},
-    {"name": "Site Instagram", "query": 'site:instagram.com "{phone}"', "category": "Google"},
-    {"name": "Site LinkedIn", "query": 'site:linkedin.com "{phone}"', "category": "Google"},
-    {"name": "Contact Page", "query": '"{phone}" contact OR kontak OR hubungi', "category": "Google"},
-    {"name": "PDF/Doc Files", "query": 'filetype:pdf OR filetype:doc "{phone}"', "category": "Google"},
-    {"name": "Pastebin", "query": 'site:pastebin.com "{phone}"', "category": "Google"},
-    {"name": "Data Breach", "query": '"{phone}" breach OR leak OR dump', "category": "Google"},
+INDONESIA_SERVICES = [
+    {"name": "GetContact ID", "url": "https://getcontact.com/id/+{e164_clean}", "note": "Indonesian caller ID"},
+    {"name": "Truecaller ID", "url": "https://www.truecaller.com/search/id/{local}", "note": "Indonesian lookup"},
+    {"name": "WhatsApp Business Check", "url": "https://wa.me/{e164_clean}", "note": "Check if business account"},
+]
+
+SOCIAL_SEARCH = [
+    {"name": "Facebook Search", "url": "https://www.facebook.com/search/top?q={e164}", "note": "Search in Facebook"},
+    {"name": "Twitter Search", "url": "https://twitter.com/search?q={e164}", "note": "Search in Twitter"},
+    {"name": "Google Search", "url": "https://www.google.com/search?q=\"{e164}\"", "note": "Google exact match"},
+    {"name": "LinkedIn Search", "url": "https://www.linkedin.com/search/results/all/?keywords={e164}", "note": "Professional search"},
+]
+
+GOOGLE_DORKS = [
+    {"name": "Exact Match", "query": '"{e164}"'},
+    {"name": "Local Format", "query": '"{local}"'},
+    {"name": "With Spaces", "query": '"{formatted}"'},
+    {"name": "Contact Pages", "query": '"{e164}" contact OR kontak OR hubungi'},
+    {"name": "PDF Files", "query": 'filetype:pdf "{e164}"'},
+    {"name": "Data Leaks", "query": '"{e164}" breach OR leak OR dump'},
+    {"name": "Pastebin", "query": 'site:pastebin.com "{e164}"'},
 ]
 
 
 class PhoneLookup(BaseScanner):
-    """Ultimate Phone Number Scanner with 50+ sources."""
+    """Phone Lookup with clear separation of verified vs manual data."""
     
     def __init__(self, language: str = "id"):
         super().__init__("Phone Lookup", language)
@@ -122,93 +93,141 @@ class PhoneLookup(BaseScanner):
     
     def scan(self, phone_number: str, **options) -> Dict[str, Any]:
         """
-        Comprehensive phone number scan.
+        Phone number intelligence scan.
         
-        Args:
-           phone_number: Number to scan (e.g., +62812345678)
-           scan_mode: 'quick' or 'deep'
+        Results are clearly labeled:
+        - verified_info: Data from APIs (carrier, location)
+        - check_links: Links for manual verification
         """
         self._start()
         
         scan_mode = options.get("scan_mode", "quick")
         
         # 1. Parse & Validate
-        console.print("[cyan]→ Validating phone number...[/cyan]")
-        basic_info = self._parse_phone(phone_number)
+        console.print("[cyan]→ Parsing phone number...[/cyan]")
+        parsed = self._parse_phone(phone_number)
         
-        if not basic_info.get("valid"):
+        if not parsed.get("valid"):
             self._add_error("Invalid phone number")
             self._finish()
             return {"valid": False, "error": "Invalid phone number format"}
-        
-        phone = basic_info["e164"]
-        phone_clean = basic_info["clean"]
-        phone_local = basic_info["local"]
-        region = basic_info["region"]
         
         results = {
             "input": phone_number,
             "scan_mode": scan_mode,
             "valid": True,
-            "parsed": basic_info,
-            "carrier_info": {},
-            "messenger_checks": [],
-            "lookup_services": [],
-            "social_search": [],
-            "indonesia_services": [],
-            "google_dorks": [],
-            "hlr_info": {},
+            
+            # VERIFIED DATA (from parsing and APIs)
+            "verified_info": {
+                "number": parsed["e164"],
+                "valid": True,
+                "country": parsed.get("region"),
+                "country_name": parsed.get("location"),
+                "carrier": parsed.get("carrier"),
+                "type": parsed.get("type"),
+                "timezones": parsed.get("timezones", []),
+                "formats": {
+                    "e164": parsed["e164"],
+                    "national": parsed["national"],
+                    "local": parsed["local"],
+                },
+            },
+            
+            # API data (if available)
+            "api_data": {},
+            
+            # MANUAL CHECK LINKS (clearly labeled)
+            "messenger_links": [],    # WhatsApp, Telegram, etc
+            "caller_id_links": [],    # Truecaller, Sync.me, etc
+            "lookup_links": [],       # Whitepages, SpyDialer, etc
+            "spam_check_links": [],   # Spam databases
+            "social_search_links": [],# Social media search
+            "indonesia_links": [],    # Indonesia-specific (if ID number)
+            "google_dorks": [],       # Google search queries
         }
         
-        # 2. Numverify API
-        console.print("[cyan]→ Querying Numverify API...[/cyan]")
-        nv_data = self.numverify.validate(phone)
+        e164_clean = parsed["e164"].replace("+", "")
+        local = parsed["local"]
+        region = parsed["region"]
+        formatted = parsed["national"]
+        
+        # 2. Numverify API (real data)
+        console.print("[cyan]→ Querying carrier API...[/cyan]")
+        nv_data = self.numverify.validate(parsed["e164"])
         if nv_data:
-            results["carrier_info"] = {
+            results["api_data"] = {
                 "carrier": nv_data.get("carrier"),
-                "location": nv_data.get("location"),
                 "line_type": nv_data.get("line_type"),
+                "location": nv_data.get("location"),
                 "country": nv_data.get("country_name"),
+                "source": "Numverify API",
             }
+            # Update verified info with API data
+            if nv_data.get("carrier"):
+                results["verified_info"]["carrier"] = nv_data.get("carrier")
+            if nv_data.get("line_type"):
+                results["verified_info"]["type"] = nv_data.get("line_type")
         
-        # 3. Generate Messenger Links
-        console.print("[cyan]→ Generating messenger check links...[/cyan]")
-        results["messenger_checks"] = self._generate_messenger_links(phone_clean, phone)
+        # 3. Generate all check links
+        console.print("[cyan]→ Generating verification links...[/cyan]")
         
-        # 4. Generate Lookup Service Links
-        console.print("[cyan]→ Generating lookup service links...[/cyan]")
-        results["lookup_services"] = self._generate_lookup_links(phone_clean, phone_local, region)
+        # Messenger
+        results["messenger_links"] = self._generate_links(
+            MESSENGER_LINKS, e164_clean=e164_clean, e164=parsed["e164"]
+        )
         
-        # 5. Social Media Search
-        console.print("[cyan]→ Generating social media search links...[/cyan]")
-        results["social_search"] = self._generate_social_links(phone, phone_local)
+        # Caller ID
+        results["caller_id_links"] = self._generate_links(
+            CALLER_ID_SERVICES, e164_clean=e164_clean, region=region.lower(), local=local
+        )
         
-        # 6. Indonesia-specific (if Indonesian number)
-        if region == "ID":
-            console.print("[cyan]→ Generating Indonesia-specific services...[/cyan]")
-            results["indonesia_services"] = self._generate_indonesia_links(phone_clean, phone_local)
-        
-        # 7. Google Dorks
-        console.print("[cyan]→ Generating Google dork queries...[/cyan]")
-        results["google_dorks"] = self._generate_google_dorks(phone, phone_local)
-        
-        # 8. HLR Simulation (Deep only)
+        # Lookup (deep only)
         if scan_mode == "deep":
-            console.print("[cyan]→ Performing HLR analysis...[/cyan]")
-            results["hlr_info"] = self._simulate_hlr(basic_info)
+            results["lookup_links"] = self._generate_links(
+                LOOKUP_SERVICES, e164_clean=e164_clean
+            )
+            
+            results["spam_check_links"] = self._generate_links(
+                SPAM_DATABASES, e164_clean=e164_clean
+            )
+        
+        # Social search
+        results["social_search_links"] = self._generate_links(
+            SOCIAL_SEARCH, e164=parsed["e164"], e164_clean=e164_clean
+        )
+        
+        # Indonesia specific
+        if region == "ID":
+            results["indonesia_links"] = self._generate_links(
+                INDONESIA_SERVICES, e164_clean=e164_clean, local=local
+            )
+        
+        # Google dorks
+        results["google_dorks"] = self._generate_dorks(
+            GOOGLE_DORKS, e164=parsed["e164"], local=local, formatted=formatted
+        )
         
         # Summary
-        total_checks = (
-            len(results["messenger_checks"]) +
-            len(results["lookup_services"]) +
-            len(results["social_search"]) +
-            len(results["indonesia_services"]) +
-            len(results["google_dorks"])
-        )
-        results["total_check_links"] = total_checks
+        total_links = sum([
+            len(results["messenger_links"]),
+            len(results["caller_id_links"]),
+            len(results["lookup_links"]),
+            len(results["spam_check_links"]),
+            len(results["social_search_links"]),
+            len(results["indonesia_links"]),
+            len(results["google_dorks"]),
+        ])
+        results["stats"] = {
+            "total_check_links": total_links,
+            "has_api_data": bool(results["api_data"]),
+        }
         
         self._finish()
         results["metadata"] = self.get_metadata()
+        
+        # Display summary
+        self._display_summary(results)
+        
         return results
     
     def _parse_phone(self, phone: str) -> Dict[str, Any]:
@@ -222,24 +241,16 @@ class PhoneLookup(BaseScanner):
             national = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
             region = phonenumbers.region_code_for_number(parsed)
             
-            # Clean formats
-            clean = e164.replace("+", "")
+            # Local format
             local = national.replace(" ", "").replace("-", "")
             if region == "ID" and not local.startswith("0"):
                 local = "0" + str(parsed.national_number)
-            
-            # Spaced format for search
-            spaced = " ".join([e164[i:i+4] for i in range(0, len(e164), 4)])
             
             return {
                 "valid": True,
                 "e164": e164,
                 "national": national,
-                "clean": clean,
                 "local": local,
-                "spaced": spaced,
-                "country_code": parsed.country_code,
-                "national_number": parsed.national_number,
                 "region": region,
                 "carrier": carrier.name_for_number(parsed, "en"),
                 "location": geocoder.description_for_number(parsed, "en"),
@@ -261,86 +272,60 @@ class PhoneLookup(BaseScanner):
         }
         return types.get(t, "Unknown")
     
-    def _generate_messenger_links(self, phone: str, e164: str) -> List[Dict]:
+    def _generate_links(self, template_list: List[Dict], **kwargs) -> List[Dict]:
+        """Generate links from template."""
         links = []
-        for p in MESSENGER_PLATFORMS:
-            url = p["url"].replace("{phone}", phone).replace("{e164}", e164)
+        for item in template_list:
+            url = item["url"]
+            for key, val in kwargs.items():
+                url = url.replace("{" + key + "}", str(val))
+            
             links.append({
-                "name": p["name"],
+                "name": item["name"],
                 "url": url,
-                "type": p["type"],
-                "category": p["category"],
+                "note": item.get("note", ""),
             })
         return links
     
-    def _generate_lookup_links(self, phone: str, phone_local: str, region: str) -> List[Dict]:
-        links = []
-        for p in PHONE_LOOKUP_SERVICES:
-            url = p["url"].replace("{phone}", phone).replace("{phone_local}", phone_local).replace("{region}", region.lower())
-            links.append({
-                "name": p["name"],
-                "url": url,
-                "type": p["type"],
-                "category": p["category"],
-            })
-        return links
-    
-    def _generate_social_links(self, phone: str, phone_local: str) -> List[Dict]:
-        links = []
-        for p in SOCIAL_PHONE_SEARCH:
-            url = p["url"].replace("{phone}", phone).replace("{phone_local}", phone_local)
-            links.append({
-                "name": p["name"],
-                "url": url,
-                "type": p["type"],
-            })
-        return links
-    
-    def _generate_indonesia_links(self, phone: str, phone_local: str) -> List[Dict]:
-        links = []
-        for p in INDONESIA_PHONE_SERVICES:
-            url = p["url"].replace("{phone}", phone).replace("{phone_local}", phone_local)
-            links.append({
-                "name": p["name"],
-                "url": url,
-                "type": p["type"],
-                "category": p["category"],
-            })
-        return links
-    
-    def _generate_google_dorks(self, phone: str, phone_local: str) -> List[Dict]:
-        # Generate spaced version
-        phone_spaced = " ".join([phone[i:i+4] for i in range(0, len(phone), 4)])
-        
+    def _generate_dorks(self, template_list: List[Dict], **kwargs) -> List[Dict]:
+        """Generate Google dork queries."""
         dorks = []
-        for d in GOOGLE_DORKS_PHONE:
-            query = d["query"].replace("{phone}", phone).replace("{phone_local}", phone_local).replace("{phone_spaced}", phone_spaced)
+        for item in template_list:
+            query = item["query"]
+            for key, val in kwargs.items():
+                query = query.replace("{" + key + "}", str(val))
+            
+            url = f"https://www.google.com/search?q={query.replace(' ', '+').replace('\"', '%22')}"
             dorks.append({
-                "name": d["name"],
+                "name": item["name"],
                 "query": query,
-                "url": f"https://www.google.com/search?q={query.replace(' ', '+').replace('\"', '%22')}",
+                "url": url,
             })
         return dorks
     
-    def _simulate_hlr(self, info: Dict) -> Dict[str, Any]:
-        time.sleep(1)
+    def _display_summary(self, results: Dict):
+        """Display a summary of verified info."""
+        console.print()
         
-        status = "Active (Simulated)"
-        if info["type"] == "Mobile" and info["carrier"]:
-            status = "Active - Mobile"
-        elif info["type"] == "VoIP":
-            status = "Active - VoIP/Virtual"
-        elif info["type"] == "Landline":
-            status = "Active - Landline"
+        table = Table(title="📱 Verified Phone Info", show_header=False)
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="white")
         
-        return {
-            "status": status,
-            "original_network": info.get("carrier", "Unknown"),
-            "reachable": True,
-            "roaming": "No",
-            "ported": "Unknown",
-            "note": "This is simulated HLR. Real HLR requires SS7 network access.",
-        }
+        vi = results["verified_info"]
+        table.add_row("Number", vi["number"])
+        table.add_row("Country", f"{vi.get('country', 'N/A')} - {vi.get('country_name', 'N/A')}")
+        table.add_row("Carrier", vi.get("carrier") or "Unknown")
+        table.add_row("Type", vi.get("type") or "Unknown")
+        
+        if results["api_data"]:
+            api = results["api_data"]
+            if api.get("line_type"):
+                table.add_row("Line Type", api["line_type"])
+        
+        console.print(table)
+        
+        console.print(f"\n[dim]Generated {results['stats']['total_check_links']} verification links.[/dim]")
+        console.print("[dim]Note: Links are for manual verification - results not guaranteed.[/dim]")
 
 
 def scan_phone(phone: str, scan_mode: str = "quick") -> Dict[str, Any]:
