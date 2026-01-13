@@ -186,16 +186,17 @@ class EmailOSINT(BaseScanner):
         if breach_data:
             results["breaches"] = breach_data
         
-        # 3. Check platforms using REAL verification (Holehe-style)
+        # 3. Check platforms using REAL verification (Holehe 120+ sites)
         if scan_mode == "deep":
-            console.print("[cyan]→ Checking platform registrations (REAL checks)...[/cyan]")
+            console.print("[cyan]→ Checking 120+ platforms (Powered by Holehe)...[/cyan]")
             try:
-                from core.platform_checker import PlatformChecker
-                checker = PlatformChecker()
-                confirmed = asyncio.run(checker.check_all_email(email))
+                from core.holehe_wrapper import run_holehe
+                confirmed = asyncio.run(run_holehe(email))
                 results["confirmed_platforms"] = confirmed
+                if confirmed:
+                    console.print(f"[green]  Found {len(confirmed)} confirmed profiles[/green]")
             except Exception as e:
-                console.print(f"[yellow]  Platform check error: {e}[/yellow]")
+                console.print(f"[yellow]  Holehe check error: {e}[/yellow]")
                 results["confirmed_platforms"] = []
         
         # 4. Generate manual check links
