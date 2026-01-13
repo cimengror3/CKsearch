@@ -23,9 +23,14 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting CKSEARCH API...")
     
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created")
+    try:
+        from .database import init_db
+        init_db()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        # Kita tidak menghentikan app agar Railway healthcheck tetap bisa jalan 
+        # (sehingga kita bisa masuk ke dashboard untuk ganti env vars)
     
     yield
     
