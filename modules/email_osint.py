@@ -200,8 +200,12 @@ class EmailOSINT(BaseScanner):
                 results["confirmed_platforms"] = []
         
         # 4. Generate manual check links
-        console.print("[cyan]→ Generating verification links...[/cyan]")
-        results["manual_check_links"] = self._generate_manual_links()
+        # Only show manual links if few automated results found (< 2)
+        if len(results.get("confirmed_platforms", [])) < 2:
+            console.print("[cyan]→ Generating verification links...[/cyan]")
+            results["manual_check_links"] = self._generate_manual_links()
+        else:
+            results["manual_check_links"] = []
         
         # 5. Generate breach check links
         results["breach_check_links"] = self._generate_breach_links(email)

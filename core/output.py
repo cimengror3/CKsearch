@@ -105,14 +105,16 @@ class OutputManager:
                 self._dict_to_tree(value, branch)
             elif isinstance(value, list):
                 branch = tree.add(f"[cyan]{key}[/cyan] ({len(value)} items)")
-                for i, item in enumerate(value[:10]):  # Limit to 10 items
+                for i, item in enumerate(value[:50]):  # Limit to 50 items
                     if isinstance(item, dict):
-                        sub_branch = branch.add(f"[yellow]Item {i+1}[/yellow]")
+                        # Use name or platform as title if available
+                        title = item.get("name") or item.get("platform") or item.get("site") or f"Item {i+1}"
+                        sub_branch = branch.add(f"[yellow]{title}[/yellow]")
                         self._dict_to_tree(item, sub_branch)
                     else:
                         branch.add(f"[green]{item}[/green]")
-                if len(value) > 10:
-                    branch.add(f"[dim]... and {len(value) - 10} more[/dim]")
+                if len(value) > 50:
+                    branch.add(f"[dim]... and {len(value) - 50} more[/dim]")
             else:
                 if value is None:
                     tree.add(f"[cyan]{key}:[/cyan] [dim]N/A[/dim]")
