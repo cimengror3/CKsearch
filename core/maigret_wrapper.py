@@ -12,6 +12,8 @@ import json
 import os
 from typing import Dict, Any, List
 
+HAS_MAIGRET = bool(shutil.which("maigret"))
+
 class MaigretWrapper:
     """Wrapper for Maigret CLI."""
     

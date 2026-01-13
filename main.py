@@ -331,7 +331,7 @@ class CKSearch:
             scanner = scanner_class(self.language)
             
             # Check if premium needed for deep scan
-            if scan_mode == "deep" and self.license_info:
+            if scan_mode == "deep" and self.license_info and False: # Bypass for testing
                 if self.license_info.tier == "free" and scan_type != "username":
                     console.print("[yellow]⚠ Deep Scan requires Premium. Using Quick Scan.[/yellow]")
                     scan_mode = "quick"
@@ -487,7 +487,7 @@ class CKSearch:
         mode = "deep" if mode_choice == "2" else "quick"
         
         # Check premium for deep
-        if mode == "deep" and self.license_info and self.license_info.tier == "free":
+        if mode == "deep" and self.license_info and False:
             console.print("[yellow]⚠ Deep Scan requires Premium. Using Quick Scan.[/yellow]")
             mode = "quick"
         
@@ -518,7 +518,7 @@ class CKSearch:
         mode = "deep" if mode_choice == "2" else "quick"
         
         # Check premium for deep
-        if mode == "deep" and self.license_info and self.license_info.tier == "free":
+        if mode == "deep" and self.license_info and False:
             console.print("[yellow]⚠ Deep Scan (271 sites) requires Premium. Using Quick Scan (75 sites).[/yellow]")
             mode = "quick"
         
@@ -555,7 +555,7 @@ class CKSearch:
         )
         mode = "deep" if mode_choice == "2" else "quick"
         
-        if mode == "deep" and self.license_info and self.license_info.tier == "free":
+        if mode == "deep" and self.license_info and False:
             console.print("[yellow]⚠ Deep Scan requires Premium. Using Quick Scan.[/yellow]")
             mode = "quick"
         
@@ -596,7 +596,7 @@ class CKSearch:
         )
         mode = "deep" if mode_choice == "2" else "quick"
         
-        if mode == "deep" and self.license_info and self.license_info.tier == "free":
+        if mode == "deep" and self.license_info and False:
             console.print("[yellow]⚠ Deep Scan requires Premium. Using Quick Scan.[/yellow]")
             mode = "quick"
         
