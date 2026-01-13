@@ -1,110 +1,84 @@
 """
-CKSEARCH - Holehe Wrapper
-===========================
-Wrapper for Holehe email OSINT tool.
-Checks registration status on 120+ sites.
+CKSEARCH - Holehe Wrapper (CLI Mode)
+======================================
+Wrapper for Holehe CLI tool.
+Runs 'holehe' command and parses output.
 """
 
 import asyncio
-import sys
-import inspect
+import shutil
+import subprocess
 from typing import Dict, Any, List
 
-# Holehe imports
-try:
-    from holehe.core import import_submodules
-except ImportError:
-    pass
-
 class HoleheWrapper:
-    """Wrapper for Holehe library."""
+    """Wrapper for Holehe CLI."""
     
     def __init__(self):
-        self.modules = []
-        try:
-            # Import modules directory
-            self.modules = import_submodules("holehe.modules")
-        except:
-            pass
+        self.cmd = shutil.which("holehe")
             
     async def check_email(self, email: str) -> List[Dict]:
-        """Check email against all Holehe modules."""
-        if not self.modules:
+        """Run holehe CLI and parse results."""
+        if not self.cmd:
             return []
             
         results = []
-        import httpx
         
-        # Use a timeout context
-        async with httpx.AsyncClient(timeout=20) as client:
-            out = []
-            tasks = []
+        # Command: holehe <email> --only-used --no-color --no-clear --no-password-recovery
+        # We skip password recovery for speed unless deep scan implied
+        
+        args = [
+            self.cmd,
+            email,
+            "--only-used",
+            "--no-color",
+            "--no-clear"
+        ]
+        
+        try:
+            # Run asynchronously
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
             
-            for module in self.modules:
-                if not hasattr(module, '__name__'):
-                    continue
+            stdout, stderr = await process.communicate()
+            output = stdout.decode('utf-8', errors='ignore')
+            
+            # Parse output
+            # Holehe output format:
+            # [+] twitter
+            # [+] instagram
+            # [-] facebook
+            
+            for line in output.splitlines():
+                line = line.strip()
+                if line.startswith("[+]"):
+                    # Example: [+] twitter
+                    # Or: [+] twitter (Category) check logic varies
                     
-                # Find the checker function in the module
-                # It usually has the same name as the module or is the only async function
-                # that isn't launch_module or maincore
-                
-                module_name = module.__name__.split('.')[-1]
-                
-                target_func = None
-                
-                # Method 1: Function with same name
-                if hasattr(module, module_name):
-                    func = getattr(module, module_name)
-                    if inspect.iscoroutinefunction(func):
-                        target_func = func
-                
-                # Method 2: Scan for async functions
-                if not target_func:
-                    for name in dir(module):
-                        if name.startswith("_"): continue
-                        attr = getattr(module, name)
-                        if inspect.iscoroutinefunction(attr):
-                            if name not in ["launch_module", "maincore"]:
-                                target_func = attr
-                                break
-                
-                if target_func:
-                    tasks.append(self._safe_run(target_func, email, client, out))
-            
-            # Run all checks
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Format results
-            for result in out:
-                if not isinstance(result, dict):
-                    continue
+                    parts = line.replace("[+]", "").strip().split()
+                    if not parts:
+                        continue
+                        
+                    platform = parts[0]
                     
-                if result.get("exists"):
-                    name = str(result.get("name", "Unknown"))
                     results.append({
-                        "platform": name,
-                        "category": self._categorize(name),
+                        "platform": platform,
+                        "category": self._categorize(platform),
                         "exists": True,
-                        "method": str(result.get("method", "holehe check")),
-                        "details": str(result.get("others") or ""),
-                        "rate_limit": result.get("rateLimit", False)
+                        "method": "holehe-cli",
+                        "details": "Registered"
                     })
                     
-        return results
-
-    async def _safe_run(self, func, email, client, out):
-        """Run a single module safely."""
-        try:
-            await func(email, client, out)
-        except Exception:
+        except Exception as e:
             pass
+            # print(f"Holehe CLI error: {e}")
+            
+        return results
 
     def _categorize(self, name: str) -> str:
         """Categorize platform based on name."""
-        if not name:
-            return "Other"
-        
         name = name.lower()
         if any(x in name for x in ["twitter", "facebook", "instagram", "tiktok", "snapchat", "pinterest", "tumblr", "reddit"]):
             return "Social"
